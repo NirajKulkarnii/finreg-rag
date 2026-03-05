@@ -27,6 +27,9 @@ rank-bm25>=0.2.2               # BM25 lexical retrieval
 # ── LLM Client (vLLM OpenAI-compatible API) ───────────────────────────────────
 openai>=1.30.0                 # vLLM exposes an OpenAI-compatible endpoint
 
+# ── Web Search Fallback ────────────────────────────────────────────────────────
+duckduckgo-search>=6.0.0       # No-API-key web search for RAG fallback
+
 # ── Evaluation ────────────────────────────────────────────────────────────────
 rouge-score>=0.1.2
 bert-score>=0.3.13

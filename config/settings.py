@@ -37,6 +37,9 @@ class Config:
     chunk_size: int = int(os.getenv("CHUNK_SIZE", "512"))
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", "64"))
 
+    # ── Prompts ───────────────────────────────────────────────────────────────
+    prompt_version: str = os.getenv("PROMPT_VERSION", "v1")
+
     # ── API ───────────────────────────────────────────────────────────────────
     api_host: str = os.getenv("API_HOST", "0.0.0.0")
     api_port: int = int(os.getenv("API_PORT", "8080"))
