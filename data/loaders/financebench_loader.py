@@ -72,7 +72,7 @@ class FinanceBenchLoader:
             doc_name = sample.get("doc_name", "")
             if doc_name in seen_docs:
                 # Append additional evidence text to existing document
-                seen_docs[doc_name].text += "\n\n" + sample.get("evidence", "")
+                seen_docs[doc_name].text += "\n\n" + self._get_evidence(sample)
             else:
                 doc = self._build_source_document(sample)
                 if doc:
@@ -129,10 +129,17 @@ class FinanceBenchLoader:
             )
         return load_dataset(HF_DATASET, split="train", trust_remote_code=True)
 
+    @staticmethod
+    def _get_evidence(sample: dict) -> str:
+        raw = sample.get("evidence", "")
+        if isinstance(raw, list):
+            raw = " ".join(str(e) for e in raw)
+        return raw.strip()
+
     def _build_source_document(self, sample: dict) -> RegulatoryDocument | None:
         """Builds a source document for knowledge base indexing."""
         doc_name = sample.get("doc_name", "")
-        evidence = sample.get("evidence", "").strip()
+        evidence = self._get_evidence(sample)
         question = sample.get("question", "")
 
         if not evidence or len(evidence) < 50:

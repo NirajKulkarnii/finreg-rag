@@ -5,7 +5,7 @@ pydantic>=2.7.0
 python-dotenv>=1.0.1
 
 # ── Data Loading ──────────────────────────────────────────────────────────────
-datasets>=2.19.0          # HuggingFace datasets (EUR-Lex, FinanceBench)
+datasets>=2.19.0,<3.0.0   # HuggingFace datasets (EUR-Lex, FinanceBench); >=3.0 dropped loading-script support required by nlpaueb/multi_eurlex
 requests>=2.31.0
 beautifulsoup4>=4.12.0    # FCA HTML scraping
 pdfplumber>=0.11.0        # FCA PDF extraction

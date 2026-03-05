@@ -46,6 +46,9 @@ faiss_index/
 logs/
 *.log
 
+# Claude
+.claude/
+
 # IDE
 .vscode/
 .idea/

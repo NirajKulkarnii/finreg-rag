@@ -115,7 +115,7 @@ class DataPipeline:
             )
 
         docs = []
-        with open(cache_file) as f:
+        with open(cache_file, encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line)
                 doc = RegulatoryDocument(
@@ -201,7 +201,7 @@ class DataPipeline:
 
     @staticmethod
     def _write_cache(docs: list[RegulatoryDocument], path: Path) -> None:
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             for doc in docs:
                 record = {
                     "doc_id": doc.doc_id,

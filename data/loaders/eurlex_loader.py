@@ -25,58 +25,24 @@ from ..models import RegulatoryDocument, DataSource
 logger = logging.getLogger(__name__)
 
 
-# EUROVOC concept IDs that map to financial / regulatory domains.
+# Top-level EUROVOC domain IDs used by the nlpaueb/multi_eurlex dataset.
+# The dataset uses 21 domain labels (100142–100162), NOT granular concept IDs.
 # Reference: https://eurovoc.europa.eu/
 FINANCIAL_EUROVOC_IDS = {
-    # Banking & finance
-    "232",    # banking
-    "2440",   # financial institution
-    "4506",   # financial market
-    "4508",   # capital market
-    "4505",   # money market
-    "1075",   # credit
-    "4790",   # securities
-    "4481",   # investment
-    "4503",   # monetary policy
-    "5859",   # payment system
-    "4512",   # financial instrument
-    # Insurance
-    "5583",   # insurance
-    "6030",   # life insurance
-    # AML / financial crime
-    "4516",   # money laundering
-    "3030",   # financial fraud
-    # Regulation & supervision
-    "5547",   # financial supervision
-    "4501",   # financial regulation
-    "4791",   # stock exchange
-    # Consumer finance
-    "4489",   # consumer credit
-    "5887",   # mortgage
+    "100148",  # FINANCE
+    "100146",  # ECONOMICS
+    "100147",  # TRADE
+    "100152",  # BUSINESS AND COMPETITION
+    "100145",  # LAW
 }
 
-# Human-readable category labels for known EUROVOC codes
+# Human-readable category labels for these domain IDs
 CATEGORY_MAP = {
-    "232": "banking",
-    "2440": "banking",
-    "4506": "financial_markets",
-    "4508": "capital_markets",
-    "4505": "money_markets",
-    "1075": "credit",
-    "4790": "securities",
-    "4481": "investment",
-    "4503": "monetary_policy",
-    "5859": "payments",
-    "4512": "financial_instruments",
-    "5583": "insurance",
-    "6030": "insurance",
-    "4516": "aml",
-    "3030": "financial_crime",
-    "5547": "supervision",
-    "4501": "regulation",
-    "4791": "securities",
-    "4489": "consumer_credit",
-    "5887": "mortgages",
+    "100148": "finance",
+    "100146": "economics",
+    "100147": "trade",
+    "100152": "business",
+    "100145": "law",
 }
 
 
