@@ -1,0 +1,37 @@
+# ── Core ──────────────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+python-dotenv>=1.0.1
+
+# ── Data Loading ──────────────────────────────────────────────────────────────
+datasets>=2.19.0          # HuggingFace datasets (EUR-Lex, FinanceBench)
+requests>=2.31.0
+beautifulsoup4>=4.12.0    # FCA HTML scraping
+pdfplumber>=0.11.0        # FCA PDF extraction
+lxml>=5.2.0
+
+# ── Embeddings ────────────────────────────────────────────────────────────────
+sentence-transformers>=3.0.0   # BGE-M3 embeddings
+torch>=2.2.0                   # Required by sentence-transformers
+
+# ── Vector Store ─────────────────────────────────────────────────────────────
+chromadb>=0.5.0
+
+# ── Retrieval ─────────────────────────────────────────────────────────────────
+rank-bm25>=0.2.2               # BM25 lexical retrieval
+
+# ── Reranking ─────────────────────────────────────────────────────────────────
+# cross-encoder loaded via sentence-transformers
+
+# ── LLM Client (vLLM OpenAI-compatible API) ───────────────────────────────────
+openai>=1.30.0                 # vLLM exposes an OpenAI-compatible endpoint
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+rouge-score>=0.1.2
+bert-score>=0.3.13
+pandas>=2.2.0
+
+# ── Observability ─────────────────────────────────────────────────────────────
+prometheus-fastapi-instrumentator>=6.1.0
+structlog>=24.1.0

@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+
+  # ── ChromaDB vector store ────────────────────────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── regiq API ────────────────────────────────────────────────────────────────
+  regiq:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - ./data/raw:/app/data/raw    # persist downloaded datasets
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8080
+
+  # ── vLLM (Qwen 2.5 14B) ─────────────────────────────────────────────────────
+  # NOTE: Requires NVIDIA GPU. Comment out if running LLM separately.
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ~/.cache/huggingface:/root/.cache/huggingface
+  #   command: >
+  #     --model Qwen/Qwen2.5-14B-Instruct
+  #     --tensor-parallel-size 1
+  #     --max-model-len 32768
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+
+volumes:
+  chroma_data:
