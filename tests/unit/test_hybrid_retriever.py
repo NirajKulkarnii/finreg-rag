@@ -146,7 +146,7 @@ class TestHybridRetrieverRetrieve:
         )
         retriever.retrieve("query")
         retriever._reranker.rerank.assert_called_once()
-        _, candidates, _ = retriever._reranker.rerank.call_args[0]
+        _, candidates = retriever._reranker.rerank.call_args[0]
         ids = {c["chunk_id"] for c in candidates}
         assert "a" in ids
         assert "b" in ids

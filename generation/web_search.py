@@ -20,6 +20,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+try:
+    from ddgs import DDGS
+except ImportError:
+    try:
+        from duckduckgo_search import DDGS  # type: ignore[no-redef]
+    except ImportError:
+        DDGS = None  # type: ignore[assignment,misc]
+
 # Maximum web results to fetch and inject into prompt
 _MAX_WEB_RESULTS = 5
 # Maximum words per web snippet to inject
@@ -54,21 +62,22 @@ async def web_search(
     formatted_str : Ready-to-inject prompt block (empty string on failure).
     raw_results   : List of dicts with keys: title, url, body.
     """
-    try:
-        from duckduckgo_search import AsyncDDGS
-    except ImportError:
+    if DDGS is None:
         logger.error(
             "duckduckgo-search is not installed. "
-            "Add it to requirements.txt: duckduckgo-search>=6.0.0"
+            "Add it to requirements.txt: duckduckgo-search>=8.0.0"
         )
         return "", []
 
+    def _sync_search() -> list[dict]:
+        with DDGS() as ddgs:
+            return ddgs.text(query, region=region, max_results=max_results)
+
     try:
-        async with AsyncDDGS() as ddgs:
-            raw: list[dict] = await asyncio.wait_for(
-                ddgs.atext(query, region=region, max_results=max_results),
-                timeout=timeout,
-            )
+        raw: list[dict] = await asyncio.wait_for(
+            asyncio.to_thread(_sync_search),
+            timeout=timeout,
+        )
     except asyncio.TimeoutError:
         logger.warning(f"Web search timed out for query: '{query[:80]}'")
         return "", []

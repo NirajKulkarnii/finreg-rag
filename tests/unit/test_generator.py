@@ -253,13 +253,13 @@ class TestRAGGeneratorStream:
         # Build a fake async stream
         tokens = ["Consumer", " Duty", " is", " important."]
 
-        async def fake_stream(*args, **kwargs):
+        async def fake_stream_gen():
             for token in tokens:
                 chunk = MagicMock()
                 chunk.choices[0].delta.content = token
                 yield chunk
 
-        generator._client.chat.completions.create = fake_stream
+        generator._client.chat.completions.create = AsyncMock(return_value=fake_stream_gen())
 
         collected = []
         async for chunk in generator.generate_stream(
@@ -279,12 +279,12 @@ class TestRAGGeneratorStream:
             return_value=Intent.REGULATORY_QUERY
         )
 
-        async def fake_stream(*args, **kwargs):
+        async def fake_stream_gen():
             chunk = MagicMock()
             chunk.choices[0].delta.content = "answer"
             yield chunk
 
-        generator._client.chat.completions.create = fake_stream
+        generator._client.chat.completions.create = AsyncMock(return_value=fake_stream_gen())
 
         meta_json = None
         async for chunk in generator.generate_stream(

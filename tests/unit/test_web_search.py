@@ -63,6 +63,15 @@ class TestBuildWebSearchQuery:
 
 # ── web_search ────────────────────────────────────────────────────────────────
 
+def _make_mock_ddgs(results):
+    """Build a MagicMock DDGS context manager that returns `results` from .text()."""
+    mock_ddgs = MagicMock()
+    mock_ddgs.__enter__ = MagicMock(return_value=mock_ddgs)
+    mock_ddgs.__exit__ = MagicMock(return_value=None)
+    mock_ddgs.text = MagicMock(return_value=results)
+    return mock_ddgs
+
+
 @pytest.mark.asyncio
 class TestWebSearch:
     async def test_returns_formatted_string_and_raw(self):
@@ -73,12 +82,7 @@ class TestWebSearch:
                 "body": "The Consumer Duty sets higher standards.",
             }
         ]
-        mock_ddgs = AsyncMock()
-        mock_ddgs.__aenter__ = AsyncMock(return_value=mock_ddgs)
-        mock_ddgs.__aexit__ = AsyncMock(return_value=None)
-        mock_ddgs.atext = AsyncMock(return_value=fake_results)
-
-        with patch("generation.web_search.AsyncDDGS", return_value=mock_ddgs):
+        with patch("generation.web_search.DDGS", return_value=_make_mock_ddgs(fake_results)):
             formatted, raw = await web_search("Consumer Duty FCA")
 
         assert "FCA Consumer Duty" in formatted
@@ -86,38 +90,29 @@ class TestWebSearch:
         assert len(raw) == 1
 
     async def test_timeout_returns_empty(self):
-        import asyncio
+        import time
 
-        mock_ddgs = AsyncMock()
-        mock_ddgs.__aenter__ = AsyncMock(return_value=mock_ddgs)
-        mock_ddgs.__aexit__ = AsyncMock(return_value=None)
-        mock_ddgs.atext = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_ddgs = _make_mock_ddgs([])
+        mock_ddgs.text = MagicMock(side_effect=lambda **kw: time.sleep(10))
 
-        with patch("generation.web_search.AsyncDDGS", return_value=mock_ddgs):
-            formatted, raw = await web_search("query", timeout=0.001)
+        with patch("generation.web_search.DDGS", return_value=mock_ddgs):
+            formatted, raw = await web_search("query", timeout=0.05)
 
         assert formatted == ""
         assert raw == []
 
     async def test_exception_returns_empty(self):
-        mock_ddgs = AsyncMock()
-        mock_ddgs.__aenter__ = AsyncMock(return_value=mock_ddgs)
-        mock_ddgs.__aexit__ = AsyncMock(return_value=None)
-        mock_ddgs.atext = AsyncMock(side_effect=RuntimeError("network error"))
+        mock_ddgs = _make_mock_ddgs([])
+        mock_ddgs.text = MagicMock(side_effect=RuntimeError("network error"))
 
-        with patch("generation.web_search.AsyncDDGS", return_value=mock_ddgs):
+        with patch("generation.web_search.DDGS", return_value=mock_ddgs):
             formatted, raw = await web_search("query")
 
         assert formatted == ""
         assert raw == []
 
     async def test_no_results_returns_empty(self):
-        mock_ddgs = AsyncMock()
-        mock_ddgs.__aenter__ = AsyncMock(return_value=mock_ddgs)
-        mock_ddgs.__aexit__ = AsyncMock(return_value=None)
-        mock_ddgs.atext = AsyncMock(return_value=[])
-
-        with patch("generation.web_search.AsyncDDGS", return_value=mock_ddgs):
+        with patch("generation.web_search.DDGS", return_value=_make_mock_ddgs([])):
             formatted, raw = await web_search("query")
 
         assert formatted == ""
@@ -125,13 +120,9 @@ class TestWebSearch:
 
     async def test_missing_duckduckgo_returns_empty(self, caplog):
         import logging
-        with patch.dict("sys.modules", {"duckduckgo_search": None}):
+        # Patch the module-level DDGS to None to simulate missing package
+        with patch("generation.web_search.DDGS", None):
             with caplog.at_level(logging.ERROR):
-                # Force reimport with patched module
-                import importlib
-                import generation.web_search as ws
-                ws_mod = importlib.import_module("generation.web_search")
-                # Simulate ImportError path
-                formatted, raw = await ws_mod.web_search("query")
+                formatted, raw = await web_search("query")
         assert formatted == ""
         assert raw == []

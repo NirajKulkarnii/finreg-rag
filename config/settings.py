@@ -7,6 +7,7 @@ Copy .env.example to .env and fill in your values.
 
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -25,6 +26,7 @@ class Config:
     chroma_host: str = os.getenv("CHROMA_HOST", "localhost")
     chroma_port: int = int(os.getenv("CHROMA_PORT", "8001"))
     chroma_collection: str = os.getenv("CHROMA_COLLECTION", "regiq_docs")
+    chroma_persistent_path: Optional[str] = os.getenv("CHROMA_PERSISTENT_PATH") or None
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
     retrieval_top_k: int = int(os.getenv("RETRIEVAL_TOP_K", "20"))

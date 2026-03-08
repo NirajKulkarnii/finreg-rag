@@ -11,9 +11,15 @@ Default model: cross-encoder/ms-marco-MiniLM-L-6-v2
 """
 
 import logging
+import math
 from typing import Optional
 
 from .models import RetrievalResult
+
+
+def _sigmoid(x: float) -> float:
+    """Map an unbounded cross-encoder logit to (0, 1)."""
+    return 1.0 / (1.0 + math.exp(-x))
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +95,7 @@ class CrossEncoderReranker:
             results.append(RetrievalResult(
                 chunk_id=cand["chunk_id"],
                 text=cand["text"],
-                score=float(ce_score),
+                score=_sigmoid(float(ce_score)),
                 dense_score=float(cand.get("dense_score", 0.0)),
                 bm25_score=float(cand.get("bm25_score", 0.0)),
                 doc_id=meta.get("doc_id", ""),

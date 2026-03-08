@@ -205,14 +205,15 @@ class RAGGenerator:
         # ── Step 6: Parse & return ─────────────────────────────────────────
         answer, confidence, follow_ups = _parse_llm_output(raw_output)
 
+        used_web = use_web and bool(web_formatted)
         return GenerationResponse(
             intent=intent,
             answer=answer,
             sources=sources,
             follow_up_questions=follow_ups,
             confidence=confidence,
-            used_web_search=use_web and bool(web_formatted),
-            web_search_query=web_query,
+            used_web_search=used_web,
+            web_search_query=web_query if used_web else None,
             retrieval_used=retrieval_used,
         )
 
@@ -283,11 +284,12 @@ class RAGGenerator:
                 yield delta
 
         # Emit structured metadata after the stream ends
+        used_web = use_web and bool(web_formatted)
         meta = {
             "intent":           intent.value,
             "sources":          [s.model_dump() for s in sources],
-            "used_web_search":  use_web and bool(web_formatted),
-            "web_search_query": web_query,
+            "used_web_search":  used_web,
+            "web_search_query": web_query if used_web else None,
             "retrieval_used":   bool(context_str),
         }
         yield f"\n__META__:{json.dumps(meta)}"

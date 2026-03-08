@@ -69,7 +69,7 @@ class Embedder:
             normalize_embeddings=self.normalize,
             show_progress_bar=False,
         )
-        return vectors.tolist()
+        return vectors.tolist() if hasattr(vectors, "tolist") else list(vectors)
 
     def embed_one(self, text: str) -> list[float]:
         return self.embed([text])[0]

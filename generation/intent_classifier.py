@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # Applied before the LLM call to save latency on obvious cases.
 
 _REGULATORY_KEYWORDS = re.compile(
-    r"\b(regulation|directive|rule|article|obligation|compliance|FCA|PRA|MiFID|CRR|"
+    r"\b(directive|rule|article|obligation|compliance|FCA|PRA|MiFID|CRR|"
     r"GDPR|AML|KYC|EMIR|SFDR|AIFMD|UCITS|Basel|Solvency|consumer duty|PS\d{2}|"
     r"CP\d{2}|TR\d{2}|policy statement|guidance|handbook|supervisory)\b",
     re.IGNORECASE,
