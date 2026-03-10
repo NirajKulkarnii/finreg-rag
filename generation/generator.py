@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time as _time
 from typing import AsyncIterator, Optional
 
 from openai import AsyncOpenAI
@@ -125,7 +126,11 @@ class RAGGenerator:
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
-    async def generate(self, request: GenerationRequest) -> GenerationResponse:
+    async def generate(
+        self,
+        request: GenerationRequest,
+        _trace: Optional[dict] = None,
+    ) -> GenerationResponse:
         """
         Full RAG generation pipeline.
 
@@ -143,31 +148,43 @@ class RAGGenerator:
         jurisdiction_filter = request.jurisdiction_filter
 
         # ── Step 1: Parallel intent classification + retrieval ─────────────
+        t0 = _time.perf_counter()
         intent_task    = self._intent_classifier.classify(query)
         retrieval_task = self._retrieve(query, source_filter, jurisdiction_filter)
 
         intent, results = await asyncio.gather(intent_task, retrieval_task)
+        t1 = _time.perf_counter()
 
         logger.info(
             f"generate | intent={intent} | retrieval_hits={len(results)} | query='{query[:80]}'"
         )
 
+        top_score = retrieval_confidence(results)
+        if _trace is not None:
+            _trace["classify_retrieve_ms"] = (t1 - t0) * 1000
+            _trace["retrieval_hits"] = len(results)
+            _trace["top_score"] = top_score
+
         # ── Step 2: Build context ──────────────────────────────────────────
         context_str, sources = build_context(results, intent)
-        top_score = retrieval_confidence(results)
         retrieval_used = bool(context_str)
 
         # ── Step 3: Web search decision ────────────────────────────────────
         use_web = should_use_web_search(top_score, intent.value, self.WEB_SEARCH_SCORE_THRESHOLD)
         web_query: Optional[str] = None
-        web_sources: list[Source] = []
 
         if use_web:
+            t_ws0 = _time.perf_counter()
             web_query = build_web_search_query(query, intent.value)
             web_formatted, web_raw = await web_search(web_query)
+            t_ws1 = _time.perf_counter()
             logger.info(f"Web search | query='{web_query}' | results={len(web_raw)}")
+            if _trace is not None:
+                _trace["web_search_ms"] = (t_ws1 - t_ws0) * 1000
         else:
             web_formatted = ""
+            if _trace is not None:
+                _trace["web_search_ms"] = 0.0
 
         # ── Step 4: Assemble user prompt ───────────────────────────────────
         pv = active_version()
@@ -189,6 +206,7 @@ class RAGGenerator:
         logger.debug(f"generate | prompt_version={pv}")
 
         # ── Step 5: LLM call ───────────────────────────────────────────────
+        t_llm0 = _time.perf_counter()
         llm_response = await self._client.chat.completions.create(
             model=self._model,
             messages=[
@@ -199,8 +217,13 @@ class RAGGenerator:
             temperature=settings.llm_temperature,
             response_format={"type": "json_object"},
         )
+        t_llm1 = _time.perf_counter()
 
         raw_output = llm_response.choices[0].message.content or ""
+
+        if _trace is not None:
+            _trace["generate_ms"] = (t_llm1 - t_llm0) * 1000
+            _trace["total_ms"] = (t_llm1 - t0) * 1000
 
         # ── Step 6: Parse & return ─────────────────────────────────────────
         answer, confidence, follow_ups = _parse_llm_output(raw_output)
