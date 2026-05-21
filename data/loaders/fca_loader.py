@@ -47,43 +47,64 @@ FCA_CATEGORIES = {
 # FCA public search API — no auth required, returns JSON
 FCA_SEARCH_API = "https://www.fca.org.uk/api/publications"
 
-# Fallback: known stable FCA publication URLs for key regulatory docs
-# These are curated high-value documents for financial compliance use cases
+# Curated list using FCA HTML publication pages (not PDFs — PDFs require browser
+# referrer headers and are frequently 403'd by FCA's CDN).
 FCA_CURATED_DOCS = [
     {
         "id": "fca-ps-23-3",
         "title": "PS23/3: Consumer Duty — final rules and guidance",
-        "url": "https://www.fca.org.uk/publication/policy/ps23-3.pdf",
+        "url": "https://www.fca.org.uk/publications/policy-statements/ps23-3-consumer-duty-final-rules-and-guidance",
         "category": "consumer_duty",
-        "date": "2022-07",
+        "date": "2023-07",
     },
     {
         "id": "fca-cp-23-28",
         "title": "CP23/28: Strengthening protections for borrowers in financial difficulty",
-        "url": "https://www.fca.org.uk/publication/consultation/cp23-28.pdf",
+        "url": "https://www.fca.org.uk/publications/consultation-papers/cp23-28-strengthening-protections-borrowers-financial-difficulty",
         "category": "consumer_credit",
         "date": "2023-11",
     },
     {
         "id": "fca-fg-21-4",
         "title": "FG21/4: Guidance for firms on the fair treatment of vulnerable customers",
-        "url": "https://www.fca.org.uk/publication/finalised-guidance/fg21-4.pdf",
+        "url": "https://www.fca.org.uk/publications/finalised-guidance/fg21-4-guidance-firms-fair-treatment-vulnerable-customers",
         "category": "consumer_protection",
         "date": "2021-02",
     },
     {
         "id": "fca-dp-23-4",
         "title": "DP23/4: Payments Regulation and the PSR Review",
-        "url": "https://www.fca.org.uk/publication/discussion/dp23-4.pdf",
+        "url": "https://www.fca.org.uk/publications/discussion-papers/dp23-4-payments-regulation-psr-review",
         "category": "payments",
         "date": "2023-11",
     },
     {
         "id": "fca-ps-22-9",
         "title": "PS22/9: Diversity and inclusion on company boards and executive management",
-        "url": "https://www.fca.org.uk/publication/policy/ps22-9.pdf",
+        "url": "https://www.fca.org.uk/publications/policy-statements/ps22-9-diversity-inclusion-company-boards-executive-management",
         "category": "governance",
         "date": "2022-04",
+    },
+    {
+        "id": "fca-fg-22-5",
+        "title": "FG22/5: Guidance on the Consumer Duty",
+        "url": "https://www.fca.org.uk/publications/finalised-guidance/fg22-5-guidance-consumer-duty",
+        "category": "consumer_duty",
+        "date": "2022-07",
+    },
+    {
+        "id": "fca-ps-24-1",
+        "title": "PS24/1: Our work on ESG ratings providers",
+        "url": "https://www.fca.org.uk/publications/policy-statements/ps24-1-our-work-esg-ratings-providers",
+        "category": "esg",
+        "date": "2024-01",
+    },
+    {
+        "id": "fca-cp-24-2",
+        "title": "CP24/2: Bringing ESG ratings providers into the regulatory perimeter",
+        "url": "https://www.fca.org.uk/publications/consultation-papers/cp24-2-bringing-esg-ratings-providers-regulatory-perimeter",
+        "category": "esg",
+        "date": "2024-01",
     },
 ]
 
@@ -101,17 +122,23 @@ class FCALoader:
     """
 
     BASE_URL = "https://www.fca.org.uk"
-    REQUEST_DELAY = 1.5   # seconds between requests — polite crawling
-    USER_AGENT = (
-        "regiq-research-bot/1.0 "
-        "(open-source regulatory intelligence RAG; "
-        "https://github.com/NirajKulkarnii/regiq)"
-    )
+    REQUEST_DELAY = 2.0   # seconds between requests — polite crawling
+
+    # FCA CDN blocks bot UAs for PDFs; HTML pages work fine with a browser UA.
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Referer": "https://www.fca.org.uk/publications",
+    }
 
     def __init__(self, request_delay: float = REQUEST_DELAY):
         self.request_delay = request_delay
         self.session = requests.Session()
-        self.session.headers.update({"User-Agent": self.USER_AGENT})
+        self.session.headers.update(self.HEADERS)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -258,25 +285,35 @@ class FCALoader:
             logger.error("beautifulsoup4 not installed. Run: pip install beautifulsoup4")
             return None
 
-        resp = self.session.get(url, timeout=20)
+        resp = self.session.get(url, timeout=25)
         resp.raise_for_status()
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # FCA pages wrap main content in .fca-content or article tags
+        # FCA publication pages: try specific content containers in order of specificity
         content = (
-            soup.find("div", class_="fca-content")
-            or soup.find("article")
+            soup.find("div", class_="publication-content")
+            or soup.find("div", class_="content-block")
+            or soup.find("div", {"id": "content"})
+            or soup.find("main", {"id": "main-content"})
             or soup.find("main")
+            or soup.find("article")
         )
         if not content:
-            content = soup
+            content = soup.find("body") or soup
 
-        # Remove nav, headers, footers, scripts
-        for tag in content.find_all(["nav", "header", "footer", "script", "style"]):
+        # Remove boilerplate elements
+        for tag in content.find_all(["nav", "header", "footer", "script",
+                                     "style", "aside", "form"]):
             tag.decompose()
+        # FCA-specific noise: cookie banners, breadcrumbs, share widgets
+        for cls in ["breadcrumb", "share-links", "related-content",
+                    "cookie-notice", "site-header", "site-footer"]:
+            for tag in content.find_all(class_=cls):
+                tag.decompose()
 
-        return content.get_text(separator="\n", strip=True)
+        text = content.get_text(separator="\n", strip=True)
+        return text if len(text) > 200 else None
 
     def _extract_pdf_text(self, url: str) -> Optional[str]:
         """Downloads a PDF and extracts its text content."""

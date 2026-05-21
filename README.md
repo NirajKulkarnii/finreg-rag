@@ -250,9 +250,10 @@ Standard Kubernetes liveness / readiness probes. `/metrics` serves Prometheus te
 ### Prerequisites
 
 - Python 3.10+
-- [vLLM](https://github.com/vllm-project/vllm) serving Qwen2.5-7B-Instruct-AWQ (or any OpenAI-compatible model)
+- [vLLM](https://github.com/vllm-project/vllm) serving any OpenAI-compatible model (Qwen2.5, Gemma, etc.)
+- Docker (recommended for ChromaDB) — or use in-process persistent mode (no Docker needed)
 
-### Install
+### 1. Install
 
 ```bash
 git clone https://github.com/<your-username>/finreg-rag.git
@@ -262,14 +263,96 @@ pip install -r requirements.txt
 cp .env.example .env   # edit VLLM_BASE_URL, VLLM_MODEL, etc.
 ```
 
-### Ingest Documents
+---
+
+### 2. Start ChromaDB
+
+**Option A — Docker (recommended)**
+
+Starts ChromaDB as a persistent container on port 8001. Data survives restarts via a named Docker volume.
 
 ```bash
-# Loads FCA + EUR-Lex + FinanceBench, chunks, embeds, stores in ChromaDB
-python -m ingestion.ingest
+docker compose up chromadb -d
+
+# Verify it's healthy
+docker compose ps
+curl http://localhost:8001/api/v1/heartbeat
+# → {"nanosecond heartbeat": ...}
 ```
 
-### Start vLLM (separate terminal)
+Make sure `.env` has (already set in `.env.example`):
+```
+CHROMA_HOST=localhost
+CHROMA_PORT=8001
+```
+And that `CHROMA_PERSISTENT_PATH` is **not** set.
+
+**Option B — No Docker (in-process persistent)**
+
+Add this line to your `.env` — ChromaDB runs inside the Python process, no server needed:
+```
+CHROMA_PERSISTENT_PATH=/absolute/path/to/finreg-rag/chroma_db
+```
+
+---
+
+### 3. Download Raw Documents
+
+Fetches documents from all three sources (FCA, EUR-Lex, FinanceBench) and caches them as JSONL files in `data/raw/`. Only needs to run once.
+
+```bash
+python -m data.pipeline
+# Creates: data/raw/fca.jsonl, data/raw/eurlex.jsonl, data/raw/financebench.jsonl
+```
+
+To download a single source:
+```bash
+python -c "
+from data.pipeline import DataPipeline
+p = DataPipeline()
+p.run(sources=['eurlex'], eurlex_max=100)
+"
+```
+
+> **Note:** FCA document downloads may fail with 403 errors due to Cloudflare bot protection on their CDN. EUR-Lex (HuggingFace dataset) and FinanceBench are unaffected. The pipeline logs warnings for failed docs and continues.
+
+---
+
+### 4. Ingest into ChromaDB
+
+Chunks, embeds (BGE-M3), and upserts all downloaded documents into ChromaDB. This is the slow step — BGE-M3 on CPU takes ~1–2 min per 100 chunks.
+
+```bash
+# All sources (uses CHROMA_* settings from .env)
+python -m ingestion.ingest
+
+# Single source (faster for a quick test)
+python -m ingestion.ingest --source eurlex
+
+# If using Option B (no Docker), pass --local
+python -m ingestion.ingest --local --local-path chroma_db
+
+# Wipe collection and re-ingest from scratch
+python -m ingestion.ingest --reset
+
+# Lower batch size on machines with <8 GB RAM
+python -m ingestion.ingest --batch-size 8
+```
+
+After ingestion, confirm the chunk count:
+```bash
+python -c "
+from config.settings import settings
+from ingestion.vector_store import VectorStore
+s = VectorStore(host=settings.chroma_host, port=settings.chroma_port,
+                persistent_path=settings.chroma_persistent_path)
+print('Chunks indexed:', s.count())
+"
+```
+
+---
+
+### 5. Start vLLM (separate terminal)
 
 ```bash
 vllm serve Qwen/Qwen2.5-7B-Instruct-AWQ \
@@ -278,13 +361,37 @@ vllm serve Qwen/Qwen2.5-7B-Instruct-AWQ \
   --max-model-len 8192
 ```
 
-### Start the API
+Any OpenAI-compatible server works — set `VLLM_BASE_URL` and `VLLM_MODEL` in `.env` accordingly.
+
+---
+
+### 6. Start the API
 
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port 8080 --workers 1
 ```
 
+> `workers=1` is required — ML models are not picklable across processes.
+
 Interactive docs: http://localhost:8080/docs
+
+---
+
+### 7. (Optional) Start the Demo Frontend
+
+A split-screen demo UI with a mobile chat interface on the left and an animated RAG pipeline diagram on the right. Designed for live presentations.
+
+```bash
+cd frontend
+npm install       # first time only
+npm run dev
+```
+
+Then open **`http://<your-server-ip>:3000`** in your local browser. The dev server binds to `0.0.0.0:3000` so it's reachable from any machine on the network.
+
+The API URL field in the header defaults to `http://localhost:8080` — change it to `http://<your-server-ip>:8080` if the browser and API are on different machines.
+
+---
 
 ### CLI Smoke Test
 
@@ -294,6 +401,23 @@ python scripts/query_test.py
 
 # Single query in streaming mode
 python scripts/query_test.py --stream --query "Explain SFDR disclosure obligations"
+```
+
+---
+
+### Full Stack with Docker Compose
+
+To run ChromaDB + the API together (vLLM must still run separately):
+
+```bash
+# Edit .env first — set VLLM_BASE_URL to your vLLM server
+docker compose up chromadb regiq -d
+
+# View logs
+docker compose logs -f regiq
+
+# Stop everything
+docker compose down
 ```
 
 ---

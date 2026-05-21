@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinReg AI — RAG Pipeline Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --indigo:      #4f46e5;
+  --indigo-dark: #3730a3;
+  --indigo-mid:  #6366f1;
+  --indigo-light:#e0e7ff;
+  --purple:      #7c3aed;
+  --green:       #16a34a;
+  --green-light: #dcfce7;
+  --amber:       #d97706;
+  --amber-light: #fef3c7;
+  --red:         #dc2626;
+  --red-light:   #fee2e2;
+  --slate-50:    #f8fafc;
+  --slate-100:   #f1f5f9;
+  --slate-200:   #e2e8f0;
+  --slate-300:   #cbd5e1;
+  --slate-500:   #64748b;
+  --slate-700:   #334155;
+  --slate-900:   #0f172a;
+  --white:       #ffffff;
+  --shadow-sm:   0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md:   0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-lg:   0 10px 30px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #eef2ff 0%, #f0f9ff 50%, #faf5ff 100%);
+  color: var(--slate-900);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header {
+  background: var(--white);
+  border-bottom: 2px solid var(--slate-200);
+  padding: 10px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  gap: 16px;
+}
+
+.header-brand { display: flex; align-items: center; gap: 12px; }
+
+.header-logo {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, var(--indigo), var(--purple));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+}
+
+.header-title {
+  font-size: 18px; font-weight: 800;
+  color: var(--indigo-dark);
+  letter-spacing: -0.3px;
+}
+
+.header-subtitle {
+  font-size: 12px;
+  color: var(--slate-500);
+  margin-top: 1px;
+  font-weight: 500;
+}
+
+.header-badges { display: flex; gap: 8px; align-items: center; }
+
+.hbadge {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+  border: 1.5px solid;
+}
+
+.hbadge-tech { border-color: #c7d2fe; color: var(--indigo); background: #eef2ff; }
+.hbadge-live { border-color: #bbf7d0; color: var(--green); background: var(--green-light);
+  display: flex; align-items: center; gap: 4px; }
+
+.live-dot {
+  width: 6px; height: 6px;
+  background: var(--green); border-radius: 50%;
+  box-shadow: 0 0 5px var(--green);
+  animation: blink 2s infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.api-cfg {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--slate-500); font-weight: 500;
+}
+
+.api-status {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #94a3b8;
+  box-shadow: 0 0 5px #94a3b8;
+  transition: background 0.4s, box-shadow 0.4s;
+  flex-shrink: 0;
+}
+
+.api-cfg input {
+  background: var(--slate-50);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: var(--slate-700);
+  font-size: 12px; font-weight: 500;
+  width: 200px; outline: none;
+  transition: border-color 0.2s;
+}
+
+.api-cfg input:focus { border-color: var(--indigo-mid); }
+
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+.main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+/* ── Left panel — RAG flow ───────────────────────────────────────────────── */
+.left-panel {
+  flex: 1.1;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-right: 2px solid var(--slate-200);
+  background: transparent;
+}
+
+.left-panel::-webkit-scrollbar { width: 5px; }
+.left-panel::-webkit-scrollbar-track { background: transparent; }
+.left-panel::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 3px; }
+
+/* ── Right panel — phone ─────────────────────────────────────────────────── */
+.right-panel {
+  width: 420px;
+  min-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #eef2ff 0%, #faf5ff 100%);
+  padding: 16px 20px;
+  gap: 10px;
+}
+
+.panel-label {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--slate-500);
+}
+
+/* ── Flow diagram header ─────────────────────────────────────────────────── */
+.flow-header {
+  text-align: center; margin-bottom: 14px; width: 100%;
+}
+
+.flow-header h2 {
+  font-size: 17px; font-weight: 800;
+  color: var(--slate-700); letter-spacing: -0.2px;
+}
+
+.flow-header p {
+  font-size: 12px; color: var(--slate-500);
+  margin-top: 3px; font-weight: 500;
+}
+
+/* Legend */
+.legend {
+  display: flex; gap: 16px; justify-content: center;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--slate-500); font-weight: 600;
+}
+
+.ldot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid;
+}
+
+.ldot-idle    { border-color: var(--slate-300); background: var(--slate-100); }
+.ldot-active  { border-color: var(--indigo-mid); background: #e0e7ff;
+                box-shadow: 0 0 6px rgba(99,102,241,0.5); }
+.ldot-done    { border-color: var(--green); background: var(--green-light); }
+.ldot-skipped { border-color: var(--slate-300); background: var(--slate-200); }
+
+/* ── Flow container ──────────────────────────────────────────────────────── */
+.flow {
+  display: flex; flex-direction: column;
+  align-items: center; width: 100%;
+  max-width: 560px; gap: 0;
+}
+
+/* ── Flow node ───────────────────────────────────────────────────────────── */
+.fnode {
+  width: 420px;
+  background: var(--white);
+  border: 2px solid var(--slate-200);
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.35s, box-shadow 0.35s, opacity 0.35s, background 0.35s;
+}
+
+.fnode.idle    { opacity: 0.55; }
+
+.fnode.active  {
+  border-color: var(--indigo-mid);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15), var(--shadow-md);
+  opacity: 1; background: #fafbff;
+  animation: pulse-node 1.8s infinite;
+}
+
+.fnode.done    {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(22,163,74,0.1), var(--shadow-sm);
+  opacity: 1; background: #fafffc;
+  animation: none;
+}
+
+.fnode.skipped {
+  opacity: 0.4;
+  border-color: var(--slate-200);
+}
+
+.fnode.error   {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(220,38,38,0.1), var(--shadow-sm);
+  background: #fff5f5; opacity: 1;
+}
+
+@keyframes pulse-node {
+  0%,100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.15), var(--shadow-md); }
+  50%      { box-shadow: 0 0 0 5px rgba(99,102,241,0.25), var(--shadow-lg); }
+}
+
+.node-top { display: flex; align-items: center; gap: 12px; }
+
+.node-emoji { font-size: 24px; line-height: 1; flex-shrink: 0; }
+
+.node-text { flex: 1; min-width: 0; }
+
+.node-name {
+  font-size: 14px; font-weight: 700;
+  color: var(--slate-900);
+}
+
+.node-desc {
+  font-size: 11px; color: var(--slate-500);
+  margin-top: 2px; font-weight: 500;
+}
+
+.node-right {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2.5px solid var(--slate-200);
+  border-top-color: var(--indigo-mid);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.timing {
+  font-size: 11px; font-weight: 700;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  background: var(--green-light);
+  color: var(--green);
+  border: 1.5px solid #bbf7d0;
+  padding: 2px 9px; border-radius: 20px;
+}
+
+.node-detail {
+  font-size: 11.5px; color: var(--slate-500);
+  line-height: 1.6; margin-top: 9px; padding-top: 9px;
+  border-top: 1.5px solid var(--slate-100);
+  display: none; word-break: break-word; font-weight: 500;
+}
+
+.fnode.active .node-detail,
+.fnode.done   .node-detail { display: block; }
+.fnode.skipped .node-detail { display: block; opacity: 0.6; }
+
+/* Parallel row */
+.parallel-row {
+  display: flex; gap: 12px; width: 420px;
+}
+
+.parallel-row .fnode { flex: 1; width: auto; min-width: 0; }
+
+/* Arrows */
+.arrow {
+  display: flex; flex-direction: column;
+  align-items: center; height: 26px; justify-content: center;
+}
+
+.aline {
+  width: 2.5px; height: 14px;
+  background: var(--slate-300);
+  transition: background 0.35s;
+}
+
+.ahead {
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--slate-300);
+  transition: border-top-color 0.35s;
+}
+
+.arrow.flowing .aline { background: var(--indigo-mid); }
+.arrow.flowing .ahead { border-top-color: var(--indigo-mid); }
+.arrow.done    .aline { background: var(--green); }
+.arrow.done    .ahead { border-top-color: var(--green); }
+
+/* Parallel merge SVG */
+.parallel-merge {
+  position: relative; width: 420px; height: 28px;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+
+.parallel-merge svg { width: 420px; height: 28px; overflow: visible; }
+
+/* ── Stats panel ─────────────────────────────────────────────────────────── */
+.stats-panel {
+  width: 420px;
+  background: var(--white);
+  border: 2px solid var(--slate-200);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-top: 10px;
+  box-shadow: var(--shadow-sm);
+  display: none;
+}
+
+.stats-panel.visible { display: block; }
+
+.stats-title {
+  font-size: 11px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--slate-500); margin-bottom: 12px;
+}
+
+.stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+
+.stat-cell {
+  background: var(--slate-50);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 10px; padding: 9px 12px;
+}
+
+.stat-label {
+  font-size: 9.5px; font-weight: 700;
+  color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.8px;
+}
+
+.stat-val {
+  font-size: 15px; font-weight: 800;
+  color: var(--slate-900); margin-top: 2px;
+}
+
+.stat-val.indigo { color: var(--indigo); }
+.stat-val.green  { color: var(--green); }
+
+/* Timing bar */
+.timing-bar { margin-top: 14px; }
+
+.timing-bar-header {
+  display: flex; justify-content: space-between;
+  font-size: 10px; font-weight: 700; color: var(--slate-500);
+  margin-bottom: 6px;
+}
+
+.timing-bar-track {
+  height: 8px; background: var(--slate-100);
+  border-radius: 4px; overflow: hidden; display: flex; gap: 1px;
+}
+
+.timing-seg {
+  height: 100%; border-radius: 3px; transition: width 0.9s ease;
+}
+
+.seg-r { background: var(--indigo-mid); }
+.seg-w { background: var(--amber); }
+.seg-g { background: var(--green); }
+
+.timing-legend {
+  display: flex; gap: 14px; margin-top: 6px;
+  font-size: 10px; color: var(--slate-500); font-weight: 600;
+}
+
+.timing-legend span {
+  display: flex; align-items: center; gap: 4px;
+}
+
+.tleg-dot {
+  width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0;
+}
+
+/* ── Phone frame ─────────────────────────────────────────────────────────── */
+.phone {
+  width: 360px;
+  background: #fff;
+  border-radius: 50px;
+  padding: 12px;
+  box-shadow:
+    0 0 0 2px #aaa,
+    0 0 0 10px #1c1c1e,
+    0 0 0 12px #555,
+    0 30px 80px rgba(0,0,0,0.25),
+    0 0 50px rgba(79,70,229,0.08);
+  position: relative;
+}
+
+.phone-notch {
+  width: 120px; height: 28px;
+  background: #1c1c1e;
+  border-radius: 0 0 20px 20px;
+  margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+
+.notch-speaker {
+  width: 40px; height: 4px; background: #3a3a3c; border-radius: 2px;
+}
+
+.notch-camera {
+  width: 10px; height: 10px; background: #2c2c2e;
+  border-radius: 50%; border: 2px solid #3a3a3c;
+}
+
+.phone-screen {
+  background: #f2f2f7;
+  border-radius: 40px;
+  height: 620px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+/* Chat app inside phone */
+.chat-app-bar {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  padding: 12px 16px 14px;
+  display: flex; align-items: center; gap: 10px;
+  color: white; flex-shrink: 0;
+}
+
+.chat-avatar {
+  width: 38px; height: 38px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; flex-shrink: 0;
+}
+
+.chat-info h3 { font-size: 14px; font-weight: 700; }
+.chat-info p  { font-size: 10px; opacity: 0.75; margin-top: 1px; font-weight: 500; }
+
+.online-pill {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 20px; padding: 3px 9px;
+  font-size: 10px; font-weight: 600;
+}
+
+.online-dot-green {
+  width: 6px; height: 6px; background: #4ade80;
+  border-radius: 50%; box-shadow: 0 0 5px #4ade80;
+}
+
+/* Messages */
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 12px 10px 8px;
+  display: flex; flex-direction: column; gap: 8px;
+  scroll-behavior: smooth;
+}
+
+.chat-messages::-webkit-scrollbar { display: none; }
+
+.msg { display: flex; flex-direction: column; max-width: 90%; gap: 4px; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.bot  { align-self: flex-start; align-items: flex-start; }
+
+.msg-bubble {
+  padding: 9px 13px; border-radius: 18px;
+  font-size: 12.5px; line-height: 1.55;
+  word-break: break-word;
+}
+
+.msg.user .msg-bubble {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white; border-radius: 18px 18px 4px 18px;
+}
+
+.msg.bot .msg-bubble {
+  background: white; color: #1c1c1e;
+  border-radius: 4px 18px 18px 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* ── Markdown rendering inside bot bubbles ───────────────────────────────── */
+.msg-bubble.md h1, .msg-bubble.md h2, .msg-bubble.md h3 {
+  font-weight: 700; color: var(--indigo-dark);
+  margin: 10px 0 4px; line-height: 1.3;
+}
+.msg-bubble.md h1 { font-size: 14px; border-bottom: 1.5px solid #e0e7ff; padding-bottom: 4px; }
+.msg-bubble.md h2 { font-size: 13px; }
+.msg-bubble.md h3 { font-size: 12px; color: var(--indigo); }
+
+.msg-bubble.md p  { margin: 5px 0; line-height: 1.6; }
+
+.msg-bubble.md ul, .msg-bubble.md ol {
+  margin: 5px 0 5px 16px; display: flex; flex-direction: column; gap: 3px;
+}
+.msg-bubble.md li { line-height: 1.55; }
+.msg-bubble.md ul li { list-style: disc; }
+.msg-bubble.md ol li { list-style: decimal; }
+.msg-bubble.md li ul, .msg-bubble.md li ol { margin-top: 3px; }
+
+.msg-bubble.md strong { font-weight: 700; color: #1c1c1e; }
+.msg-bubble.md em     { font-style: italic; color: var(--slate-700); }
+
+.msg-bubble.md code {
+  background: #f0f4ff; color: var(--indigo);
+  padding: 1px 5px; border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 10.5px;
+}
+
+.msg-bubble.md blockquote {
+  border-left: 3px solid var(--indigo-mid);
+  background: #f5f7ff; margin: 6px 0;
+  padding: 5px 10px; border-radius: 0 8px 8px 0;
+  font-style: italic; color: var(--slate-700);
+}
+
+/* Table */
+.msg-bubble.md table {
+  width: 100%; border-collapse: collapse;
+  margin: 8px 0; font-size: 10.5px;
+  border-radius: 8px; overflow: hidden;
+}
+.msg-bubble.md th {
+  background: var(--indigo); color: white;
+  padding: 6px 8px; text-align: left; font-weight: 700;
+}
+.msg-bubble.md td {
+  padding: 5px 8px; border-bottom: 1px solid #e0e7ff; color: #1c1c1e;
+}
+.msg-bubble.md tr:last-child td { border-bottom: none; }
+.msg-bubble.md tr:nth-child(even) td { background: #f5f7ff; }
+
+.msg-bubble.md > *:first-child { margin-top: 0; }
+.msg-bubble.md > *:last-child  { margin-bottom: 0; }
+
+/* Welcome card */
+.welcome-card {
+  background: white;
+  border-radius: 4px 18px 18px 18px;
+  padding: 11px 13px;
+  font-size: 12px; color: #333; line-height: 1.6;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.example-chips {
+  display: flex; flex-direction: column; gap: 5px; margin-top: 8px;
+}
+
+.chip {
+  background: #eef2ff; color: #4338ca;
+  border: 1.5px solid #c7d2fe;
+  border-radius: 14px; padding: 6px 12px;
+  font-size: 11px; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  text-align: left; line-height: 1.4; font-weight: 500;
+}
+
+.chip:hover { background: #e0e7ff; transform: translateY(-1px); }
+.chip:active { transform: translateY(0); }
+
+/* Response meta */
+.msg-meta {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 4px; padding: 0 2px;
+}
+
+.mbadge {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 10px;
+}
+
+.mbadge-high   { background: var(--green-light); color: var(--green); }
+.mbadge-medium { background: var(--amber-light); color: var(--amber); }
+.mbadge-low    { background: var(--red-light); color: var(--red); }
+.mbadge-intent { background: #eef2ff; color: var(--indigo); }
+.mbadge-web    { background: #dbeafe; color: #1d4ed8; }
+
+/* Sources */
+.sources-row { padding: 0 2px; }
+
+.sources-toggle {
+  font-size: 11px; font-weight: 600;
+  color: var(--indigo-mid); cursor: pointer;
+  display: flex; align-items: center; gap: 3px;
+  user-select: none;
+}
+
+.sources-list { display: none; flex-direction: column; gap: 4px; margin-top: 5px; }
+.sources-list.open { display: flex; }
+
+.source-item {
+  background: #eef2ff;
+  border-left: 3px solid var(--indigo-mid);
+  padding: 5px 9px;
+  border-radius: 0 8px 8px 0;
+  font-size: 10px; color: #334155; line-height: 1.4; font-weight: 500;
+}
+
+/* Follow-ups */
+.followups { display: flex; flex-direction: column; gap: 4px; padding: 0 2px; }
+
+.followup-chip {
+  background: #eef2ff; color: #4338ca;
+  border-radius: 12px; padding: 5px 10px;
+  font-size: 10.5px; cursor: pointer;
+  transition: background 0.15s; line-height: 1.4; font-weight: 500;
+}
+
+.followup-chip:hover { background: #e0e7ff; }
+
+/* Typing indicator */
+.typing-bubble {
+  display: flex; align-items: center; gap: 5px;
+  padding: 11px 16px; background: white;
+  border-radius: 4px 18px 18px 18px;
+  width: fit-content;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.tdot {
+  width: 7px; height: 7px; background: #c7d2fe; border-radius: 50%;
+  animation: bounce 1.3s infinite ease-in-out;
+}
+
+.tdot:nth-child(2) { animation-delay: 0.16s; }
+.tdot:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes bounce {
+  0%,55%,100% { transform: translateY(0); opacity: 0.5; }
+  27%          { transform: translateY(-6px); opacity: 1; }
+}
+
+/* Chat input bar */
+.chat-input-bar {
+  padding: 8px 10px 12px; background: white;
+  border-top: 1.5px solid #f0f0f5;
+  display: flex; gap: 7px; align-items: center; flex-shrink: 0;
+}
+
+.chat-input-bar input {
+  flex: 1; background: #f2f2f7;
+  border: 1.5px solid #e5e5ea;
+  border-radius: 22px; padding: 9px 16px;
+  font-size: 12px; outline: none; color: #1c1c1e;
+  transition: border-color 0.15s; font-weight: 500;
+}
+
+.chat-input-bar input:focus { border-color: var(--indigo-mid); }
+.chat-input-bar input::placeholder { color: #c7c7cc; }
+.chat-input-bar input:disabled { opacity: 0.5; }
+
+.send-btn {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.35);
+}
+
+.send-btn:hover:not(:disabled) { transform: scale(1.08); box-shadow: 0 4px 12px rgba(79,70,229,0.45); }
+.send-btn:active:not(:disabled) { transform: scale(0.95); }
+.send-btn:disabled { opacity: 0.4; cursor: default; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">🏛️</div>
+    <div>
+      <div class="header-title">FinReg AI Assistant</div>
+      <div class="header-subtitle">Retrieval-Augmented Generation · Live Pipeline Demo</div>
+    </div>
+  </div>
+
+  <div class="header-badges">
+    <span class="hbadge hbadge-tech">BGE-M3 · BM25 · Cross-Encoder · Qwen2.5</span>
+    <span class="hbadge hbadge-live">
+      <span class="live-dot"></span> Live
+    </span>
+  </div>
+
+  <div class="api-cfg">
+    <div class="api-status" id="apiStatus"></div>
+    <span style="font-weight:600">API</span>
+    <input type="text" id="apiUrl" value="http://localhost:8089" placeholder="http://localhost:8089">
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- ── Left: RAG flow ── -->
+  <div class="left-panel">
+
+    <div class="flow-header">
+      <h2>🔬 RAG Pipeline — Step by Step</h2>
+      <p>Each step lights up as your question travels through the system</p>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="ldot ldot-idle"></div> Waiting</div>
+      <div class="legend-item"><div class="ldot ldot-active"></div> Processing</div>
+      <div class="legend-item"><div class="ldot ldot-done"></div> Complete</div>
+      <div class="legend-item"><div class="ldot ldot-skipped"></div> Skipped</div>
+    </div>
+
+    <div class="flow">
+
+      <!-- 1. User Question -->
+      <div class="fnode idle" id="n-query">
+        <div class="node-top">
+          <div class="node-emoji">📝</div>
+          <div class="node-text">
+            <div class="node-name">Your Question</div>
+            <div class="node-desc">Customer types a question → enters the pipeline</div>
+          </div>
+          <div class="node-right" id="r-query"></div>
+        </div>
+        <div class="node-detail" id="d-query">Waiting for a question…</div>
+      </div>
+
+      <div class="arrow" id="a1"><div class="aline"></div><div class="ahead"></div></div>
+
+      <!-- 2. Parallel: Intent + Search -->
+      <div class="parallel-row">
+        <div class="fnode idle" id="n-intent">
+          <div class="node-top">
+            <div class="node-emoji">🎯</div>
+            <div class="node-text">
+              <div class="node-name">Intent Classifier</div>
+              <div class="node-desc">What kind of question is this?</div>
+            </div>
+            <div class="node-right" id="r-intent"></div>
+          </div>
+          <div class="node-detail" id="d-intent">Classifying…</div>
+        </div>
+
+        <div class="fnode idle" id="n-retrieval">
+          <div class="node-top">
+            <div class="node-emoji">🔍</div>
+            <div class="node-text">
+              <div class="node-name">Document Search</div>
+              <div class="node-desc">Vector + keyword search</div>
+            </div>
+            <div class="node-right" id="r-retrieval"></div>
+          </div>
+          <div class="node-detail" id="d-retrieval">Searching…</div>
+        </div>
+      </div>
+
+      <!-- Converging arrows -->
+      <div class="parallel-merge">
+        <svg viewBox="0 0 420 28" preserveAspectRatio="none">
+          <path d="M 105 0 Q 105 14 210 26" fill="none" stroke="#cbd5e1" stroke-width="2.5" id="ml"/>
+          <path d="M 315 0 Q 315 14 210 26" fill="none" stroke="#cbd5e1" stroke-width="2.5" id="mr"/>
+          <polygon points="205,24 215,24 210,30" fill="#cbd5e1" id="mhead"/>
+        </svg>
+      </div>
+
+      <!-- 3. Reranker -->
+      <div class="fnode idle" id="n-reranker">
+        <div class="node-top">
+          <div class="node-emoji">📊</div>
+          <div class="node-text">
+            <div class="node-name">Smart Reranker</div>
+            <div class="node-desc">Cross-encoder scores each result for relevance to your question</div>
+          </div>
+          <div class="node-right" id="r-reranker"></div>
+        </div>
+        <div class="node-detail" id="d-reranker">Scoring documents…</div>
+      </div>
+
+      <div class="arrow" id="a3"><div class="aline"></div><div class="ahead"></div></div>
+
+      <!-- 4. Context Builder -->
+      <div class="fnode idle" id="n-context">
+        <div class="node-top">
+          <div class="node-emoji">📚</div>
+          <div class="node-text">
+            <div class="node-name">Context Builder</div>
+            <div class="node-desc">Packs the best passages into the AI's memory window</div>
+          </div>
+          <div class="node-right" id="r-context"></div>
+        </div>
+        <div class="node-detail" id="d-context">Building context…</div>
+      </div>
+
+      <div class="arrow" id="a4"><div class="aline"></div><div class="ahead"></div></div>
+
+      <!-- 5. Web Search (conditional) -->
+      <div class="fnode idle" id="n-web">
+        <div class="node-top">
+          <div class="node-emoji">🌐</div>
+          <div class="node-text">
+            <div class="node-name">Web Search Fallback</div>
+            <div class="node-desc">Live search — only triggered when local docs aren't enough</div>
+          </div>
+          <div class="node-right" id="r-web"></div>
+        </div>
+        <div class="node-detail" id="d-web">Deciding if needed…</div>
+      </div>
+
+      <div class="arrow" id="a5"><div class="aline"></div><div class="ahead"></div></div>
+
+      <!-- 6. LLM -->
+      <div class="fnode idle" id="n-llm">
+        <div class="node-top">
+          <div class="node-emoji">🤖</div>
+          <div class="node-text">
+            <div class="node-name">AI Generation</div>
+            <div class="node-desc">Qwen2.5 writes a grounded, cited answer from retrieved context</div>
+          </div>
+          <div class="node-right" id="r-llm"></div>
+        </div>
+        <div class="node-detail" id="d-llm">Generating answer…</div>
+      </div>
+
+      <div class="arrow" id="a6"><div class="aline"></div><div class="ahead"></div></div>
+
+      <!-- 7. Done -->
+      <div class="fnode idle" id="n-done">
+        <div class="node-top">
+          <div class="node-emoji">✅</div>
+          <div class="node-text">
+            <div class="node-name">Answer Delivered</div>
+            <div class="node-desc">Structured response with sources sent to the customer</div>
+          </div>
+          <div class="node-right" id="r-done"></div>
+        </div>
+        <div class="node-detail" id="d-done">Ready for your question…</div>
+      </div>
+
+      <!-- Stats panel -->
+      <div class="stats-panel" id="statsPanel">
+        <div class="stats-title">⚡ Pipeline Summary</div>
+        <div class="stats-grid">
+          <div class="stat-cell">
+            <div class="stat-label">Intent Detected</div>
+            <div class="stat-val indigo" id="st-intent">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Confidence</div>
+            <div class="stat-val" id="st-conf">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Docs Found</div>
+            <div class="stat-val" id="st-docs">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Top Relevance</div>
+            <div class="stat-val green" id="st-score">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Sources Cited</div>
+            <div class="stat-val" id="st-sources">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Web Search</div>
+            <div class="stat-val" id="st-web">—</div>
+          </div>
+        </div>
+
+        <div class="timing-bar">
+          <div class="timing-bar-header">
+            <span>Time breakdown</span>
+            <span id="st-total" style="color:var(--indigo);font-weight:800">—</span>
+          </div>
+          <div class="timing-bar-track">
+            <div class="timing-seg seg-r" id="bar-r" style="width:0%"></div>
+            <div class="timing-seg seg-w" id="bar-w" style="width:0%"></div>
+            <div class="timing-seg seg-g" id="bar-g" style="width:0%"></div>
+          </div>
+          <div class="timing-legend">
+            <span><span class="tleg-dot" style="background:var(--indigo-mid)"></span>Retrieve</span>
+            <span><span class="tleg-dot" style="background:var(--amber)"></span>Web</span>
+            <span><span class="tleg-dot" style="background:var(--green)"></span>Generate</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /flow -->
+  </div><!-- /left-panel -->
+
+  <!-- ── Right: phone ── -->
+  <div class="right-panel">
+    <div class="panel-label">Customer Chat Interface</div>
+
+    <div class="phone">
+      <div class="phone-notch">
+        <div class="notch-speaker"></div>
+        <div class="notch-camera"></div>
+      </div>
+
+      <div class="phone-screen">
+        <div class="chat-app-bar">
+          <div class="chat-avatar">🏦</div>
+          <div class="chat-info">
+            <h3>FinReg Assistant</h3>
+            <p>Financial Regulation AI · Powered by RAG</p>
+          </div>
+          <div class="online-pill">
+            <div class="online-dot-green"></div>
+            Online
+          </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg bot">
+            <div class="welcome-card">
+              👋 Hi! I can answer questions about EU financial regulations and public company financial reports.<br><br>
+              Try one of these:
+            </div>
+            <div class="example-chips">
+              <div class="chip" onclick="sendQuery(this.textContent)">What are the key obligations under MiFID II for investment firms?</div>
+              <div class="chip" onclick="sendQuery(this.textContent)">What does SFDR require for sustainable finance disclosures?</div>
+              <div class="chip" onclick="sendQuery(this.textContent)">What was Apple's total revenue in fiscal year 2022?</div>
+              <div class="chip" onclick="sendQuery(this.textContent)">What are the main risk factors in Microsoft's latest 10-K filing?</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-bar">
+          <input type="text" id="chatInput"
+            placeholder="Ask about financial regulations…"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}">
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div><!-- /right-panel -->
+
+</div><!-- /main -->
+
+<script>
+const apiUrl = () => document.getElementById('apiUrl').value.replace(/\/$/, '');
+let busy = false;
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+const INTENT_LABELS = {
+  regulatory_query: 'Regulatory',
+  financial_data:   'Financial Data',
+  general_finreg:   'General FinReg',
+  out_of_scope:     'Out of Scope',
+};
+
+const fmtIntent = s => INTENT_LABELS[s] || s;
+const fmtMs = ms => ms >= 1000 ? `${(ms/1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+
+// ── Node / arrow helpers ──────────────────────────────────────────────────────
+function node(id, state, detail, timing) {
+  const el = document.getElementById('n-' + id);
+  if (!el) return;
+  el.className = 'fnode ' + state;
+
+  const r = document.getElementById('r-' + id);
+  if (r) {
+    let html = '';
+    if (state === 'active') {
+      html = '<div class="spinner"></div>';
+    } else if (state === 'done') {
+      html = '✅';
+      if (timing != null) html += ` <span class="timing">${timing}</span>`;
+    } else if (state === 'skipped') {
+      html = '⏭️';
+    }
+    r.innerHTML = html;
+  }
+
+  if (detail != null) {
+    const d = document.getElementById('d-' + id);
+    if (d) d.textContent = detail;
+  }
+}
+
+function arrow(id, state) {
+  const el = document.getElementById('a' + id);
+  if (el) el.className = 'arrow ' + state;
+}
+
+function mergeSvg(state) {
+  const colors = { idle: '#cbd5e1', flowing: '#6366f1', done: '#16a34a' };
+  const c = colors[state] || colors.idle;
+  ['ml','mr'].forEach(i => {
+    const p = document.getElementById(i);
+    if (p) p.setAttribute('stroke', c);
+  });
+  const h = document.getElementById('mhead');
+  if (h) h.setAttribute('fill', c);
+}
+
+function reset() {
+  ['query','intent','retrieval','reranker','context','web','llm','done'].forEach(id => {
+    node(id, 'idle', null, null);
+    const r = document.getElementById('r-' + id);
+    if (r) r.innerHTML = '';
+  });
+  [1,3,4,5,6].forEach(i => arrow(i, ''));
+  mergeSvg('idle');
+  document.getElementById('statsPanel').classList.remove('visible');
+}
+
+// ── Animation ─────────────────────────────────────────────────────────────────
+async function animate(resp, query) {
+  const t   = resp.timings || {};
+  const p1  = t.classify_retrieve_ms || 800;
+  const wsMs = t.web_search_ms || 0;
+  const gMs = t.generate_ms || 1000;
+  const tot = t.total_ms || (p1 + wsMs + gMs);
+
+  const MIN = 550;
+  const d1 = Math.max(p1 * 0.32, MIN);
+  const dws = wsMs > 0 ? Math.max(wsMs * 0.32, MIN) : 0;
+  const dg = Math.max(gMs * 0.32, MIN);
+
+  // 1. Query
+  node('query', 'active', `"${query.slice(0,60)}${query.length>60?'…':''}"`);
+  await wait(380);
+  node('query', 'done', 'Question received and entered the pipeline');
+  arrow(1, 'flowing'); await wait(220); arrow(1, 'done');
+
+  // 2. Parallel: intent + retrieval
+  node('intent', 'active', 'Analysing question topic and type…');
+  node('retrieval', 'active', 'Searching thousands of regulatory documents simultaneously…');
+  await wait(d1);
+  node('intent', 'done', `Detected: ${fmtIntent(resp.intent)}`, fmtMs(p1/2));
+  node('retrieval', 'done', `Found ${t.retrieval_hits ?? resp.sources.length} candidate documents`, fmtMs(p1/2));
+  mergeSvg('flowing'); await wait(220); mergeSvg('done');
+
+  // 3. Reranker
+  node('reranker', 'active', 'Cross-encoder AI scores each document for relevance…');
+  await wait(MIN);
+  node('reranker', 'done', `Best match: ${((t.top_score||0)*100).toFixed(0)}% relevance`);
+  arrow(3, 'flowing'); await wait(220); arrow(3, 'done');
+
+  // 4. Context builder
+  node('context', 'active', 'Extracting key passages and fitting them into the AI context window…');
+  await wait(MIN);
+  node('context', 'done', resp.retrieval_used
+    ? 'Regulatory excerpts packed into context'
+    : 'No strong local match — relying on AI general knowledge');
+  arrow(4, 'flowing'); await wait(220); arrow(4, 'done');
+
+  // 5. Web search
+  if (resp.used_web_search) {
+    node('web', 'active', `Searching live web: "${resp.web_search_query||'regulatory sources'}"`);
+    await wait(dws);
+    node('web', 'done', 'Live web results added to context', fmtMs(wsMs));
+  } else {
+    node('web', 'skipped', 'Local documents were strong enough — web search skipped');
+  }
+  arrow(5, 'flowing'); await wait(220); arrow(5, 'done');
+
+  // 6. LLM
+  node('llm', 'active', 'Qwen2.5 reads the context and writes a grounded, cited answer…');
+  await wait(dg);
+  node('llm', 'done', `Answer written · ${resp.confidence} confidence · ${resp.sources.length} sources`, fmtMs(gMs));
+  arrow(6, 'flowing'); await wait(220); arrow(6, 'done');
+
+  // 7. Done
+  node('done', 'done', `Delivered to customer in ${fmtMs(tot)} · ${resp.sources.length} citations attached`);
+
+  showStats(resp, t, tot);
+}
+
+function showStats(resp, t, tot) {
+  document.getElementById('st-intent').textContent  = fmtIntent(resp.intent);
+  document.getElementById('st-conf').textContent    = resp.confidence;
+  document.getElementById('st-docs').textContent    = `${t.retrieval_hits ?? resp.sources.length}`;
+  document.getElementById('st-score').textContent   = `${((t.top_score||0)*100).toFixed(0)}%`;
+  document.getElementById('st-sources').textContent = `${resp.sources.length}`;
+  document.getElementById('st-web').textContent     = resp.used_web_search ? '✅ Yes' : 'No';
+  document.getElementById('st-total').textContent   = fmtMs(tot);
+  const p1 = t.classify_retrieve_ms||0, ws = t.web_search_ms||0, gn = t.generate_ms||0;
+  const sum = p1 + ws + gn || 1;
+  document.getElementById('bar-r').style.width = `${(p1/sum)*100}%`;
+  document.getElementById('bar-w').style.width = `${(ws/sum)*100}%`;
+  document.getElementById('bar-g').style.width = `${(gn/sum)*100}%`;
+  document.getElementById('statsPanel').classList.add('visible');
+}
+
+// ── Chat UI ───────────────────────────────────────────────────────────────────
+const scrollChat = () => {
+  const c = document.getElementById('chatMessages');
+  c.scrollTop = c.scrollHeight;
+};
+
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function addUserMsg(text) {
+  const msgs = document.getElementById('chatMessages');
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  d.innerHTML = `<div class="msg-bubble">${esc(text)}</div>`;
+  msgs.appendChild(d); scrollChat();
+}
+
+function addTyping() {
+  const msgs = document.getElementById('chatMessages');
+  const d = document.createElement('div');
+  d.className = 'msg bot'; d.id = 'typing-el';
+  d.innerHTML = `<div class="typing-bubble">
+    <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+  </div>`;
+  msgs.appendChild(d); scrollChat();
+  return d;
+}
+
+function addBotMsg(resp) {
+  const msgs = document.getElementById('chatMessages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble md';
+  bubble.innerHTML = marked.parse(resp.answer || '');
+  wrap.appendChild(bubble);
+
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.innerHTML =
+    `<span class="mbadge mbadge-${resp.confidence}">${resp.confidence} confidence</span>` +
+    `<span class="mbadge mbadge-intent">${fmtIntent(resp.intent)}</span>` +
+    (resp.used_web_search ? `<span class="mbadge mbadge-web">🌐 web</span>` : '');
+  wrap.appendChild(meta);
+
+  if (resp.sources?.length) {
+    const sr = document.createElement('div');
+    sr.className = 'sources-row';
+    const tgl = document.createElement('div');
+    tgl.className = 'sources-toggle';
+    tgl.innerHTML = `📎 ${resp.sources.length} source${resp.sources.length>1?'s':''} — tap to view`;
+    const list = document.createElement('div');
+    list.className = 'sources-list';
+    resp.sources.slice(0,4).forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'source-item';
+      item.textContent = `${s.title} · ${s.jurisdiction} · ${(s.relevance_score*100).toFixed(0)}%`;
+      list.appendChild(item);
+    });
+    tgl.onclick = () => list.classList.toggle('open');
+    sr.appendChild(tgl); sr.appendChild(list);
+    wrap.appendChild(sr);
+  }
+
+  if (resp.follow_up_questions?.length) {
+    const fq = document.createElement('div');
+    fq.className = 'followups';
+    resp.follow_up_questions.forEach(q => {
+      const c = document.createElement('div');
+      c.className = 'followup-chip';
+      c.textContent = `💬 ${q}`;
+      c.onclick = () => sendQuery(q);
+      fq.appendChild(c);
+    });
+    wrap.appendChild(fq);
+  }
+
+  msgs.appendChild(wrap); scrollChat();
+}
+
+// ── Send ──────────────────────────────────────────────────────────────────────
+async function sendQuery(text) {
+  if (busy) return;
+  document.getElementById('chatInput').value = text;
+  await sendMessage();
+}
+
+async function sendMessage() {
+  if (busy) return;
+  const input = document.getElementById('chatInput');
+  const query = input.value.trim();
+  if (!query) return;
+
+  busy = true;
+  input.value = ''; input.disabled = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  reset();
+  addUserMsg(query);
+  const typing = addTyping();
+  node('query', 'active', `"${query.slice(0,60)}${query.length>60?'…':''}"`);
+
+  try {
+    const res = await fetch(`${apiUrl()}/v1/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+    const data = await res.json();
+    typing.remove();
+    addBotMsg(data);
+    await animate(data, query);
+
+  } catch (err) {
+    typing.remove();
+    const msgs = document.getElementById('chatMessages');
+    const d = document.createElement('div');
+    d.className = 'msg bot';
+    d.innerHTML = `<div class="msg-bubble" style="background:#fee2e2;color:#991b1b;border:1.5px solid #fca5a5">
+      ⚠️ Could not reach the API at <strong>${apiUrl()}</strong>.<br>
+      Make sure the backend is running:<br>
+      <code style="font-size:10px;background:rgba(0,0,0,0.06);padding:2px 5px;border-radius:4px">uvicorn api.main:app --port 8089</code>
+    </div>`;
+    msgs.appendChild(d); scrollChat();
+    node('query', 'error', `Error: ${err.message.slice(0,80)}`);
+    console.error('[FinReg Demo]', err);
+  } finally {
+    busy = false;
+    input.disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+}
+
+// ── API health check ──────────────────────────────────────────────────────────
+async function checkApi() {
+  const dot = document.getElementById('apiStatus');
+  try {
+    const r = await fetch(`${apiUrl()}/health`, { signal: AbortSignal.timeout(3000) });
+    const ok = r.ok;
+    dot.style.background = ok ? '#16a34a' : '#d97706';
+    dot.style.boxShadow  = ok ? '0 0 7px #16a34a' : '0 0 7px #d97706';
+  } catch {
+    dot.style.background = '#dc2626';
+    dot.style.boxShadow  = '0 0 7px #dc2626';
+  }
+}
+
+document.getElementById('apiUrl').addEventListener('change', checkApi);
+checkApi();
+</script>
+</body>
+</html>

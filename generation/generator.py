@@ -88,8 +88,10 @@ class RAGGenerator:
         vLLM model name (e.g. "Qwen/Qwen2.5-7B-Instruct").
     """
 
-    # Score below which web search fallback is triggered
-    WEB_SEARCH_SCORE_THRESHOLD = 0.25
+    # Score below which web search fallback is triggered.
+    # Lowered from 0.25 because ms-marco cross-encoder scores EUR-Lex / FinanceBench
+    # chunks in the 0.05–0.15 range due to domain mismatch with web-passage training data.
+    WEB_SEARCH_SCORE_THRESHOLD = 0.10
 
     def __init__(
         self,
@@ -181,6 +183,19 @@ class RAGGenerator:
             logger.info(f"Web search | query='{web_query}' | results={len(web_raw)}")
             if _trace is not None:
                 _trace["web_search_ms"] = (t_ws1 - t_ws0) * 1000
+            # Convert web results to Source objects so they appear as citations
+            if web_raw and not sources:
+                sources = [
+                    Source(
+                        title=item.get("title", "Web Result"),
+                        url=item.get("href", item.get("url", "")),
+                        source="web",
+                        jurisdiction="",
+                        date_published="",
+                        relevance_score=round(max(0.0, 1.0 - i * 0.15), 2),
+                    )
+                    for i, item in enumerate(web_raw[:4])
+                ]
         else:
             web_formatted = ""
             if _trace is not None:

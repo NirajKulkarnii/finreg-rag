@@ -37,8 +37,11 @@ _BUDGET: dict[str, tuple[int, int]] = {
 }
 
 # Minimum cross-encoder score to include a chunk in context.
-# Below this the chunk is likely off-topic; better not to inject noise.
-_MIN_SCORE_THRESHOLD = 0.15
+# Kept low (0.05) because ms-marco-MiniLM was trained on web passages and
+# systematically under-scores formal legal text (EUR-Lex) and SEC filings
+# (FinanceBench). Dense retrieval (BGE-M3) still finds relevant chunks;
+# the cross-encoder logits are just shifted negative for these domains.
+_MIN_SCORE_THRESHOLD = 0.05
 
 
 def _truncate_to_words(text: str, max_words: int) -> str:

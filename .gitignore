@@ -71,3 +71,9 @@ coverage.xml
 
 # Docker
 .docker/
+
+# Frontend
+frontend/node_modules/
+frontend/package-lock.json
+frontend/dist/
+frontend/.vite/

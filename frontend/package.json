@@ -1,0 +1,13 @@
+{
+  "name": "finreg-rag-demo",
+  "version": "1.0.0",
+  "description": "FinReg RAG demo frontend — split-screen mobile chat + pipeline diagram",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
